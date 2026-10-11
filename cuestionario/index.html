@@ -339,8 +339,9 @@ document.getElementById("copy").addEventListener("click", function () {
   function fallback() { var t = document.createElement("textarea"); t.value = m; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); st.textContent = "Respuestas copiadas. Pégalas en WhatsApp."; } catch (e) { st.textContent = "No se pudo copiar automáticamente."; } t.remove(); }
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(m).then(function () { st.textContent = "Respuestas copiadas. Pégalas en WhatsApp."; }, fallback); else fallback();
 });
-/* Envío por email (FormSubmit, sin servidor propio). La primera vez hay que confirmar el correo desde el aviso que llega a MAIL_TO. */
+/* Envío por email: Google Apps Script (guarda la respuesta en la hoja «Respuestas de clientes» y la manda a MAIL_TO). */
 var MAIL_TO = "antolienrique@gmail.com";
+var MAIL_URL = "https://script.google.com/macros/s/AKfycbwI_yid86pV-LGGSHw9jqaX_mrFVo7L5HVQsdQNVtiWv1oh9My8LBZ_CrtZ60ujvSGvmg/exec";
 function emailFields(kind, def, v) {
   var rows = [];
   def.forEach(function (s) {
@@ -359,9 +360,7 @@ document.getElementById("mail").addEventListener("click", function () {
   var btn = this, st = document.getElementById("status"), fb = document.getElementById("mailfb");
   var v = values(forms[cur], defs[cur]);
   var subject = (cur === "ini" ? "Cuestionario inicial" : "Revisión semanal") + " · " + (v.nombre || "cliente") + " · " + BRAND;
-  var data = { _subject: subject, _template: "table", _captcha: "false" };
-  if (v.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) data._replyto = v.email;
-  emailFields(cur, defs[cur], v).forEach(function (r) { data[r[0]] = r[1]; });
+  var data = { formulario: cur === "ini" ? "Cuestionario inicial" : "Revisión semanal", asunto: subject, nombre: v.nombre || "", email: (v.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) ? v.email : "", texto: m };
   var plain = m.replace(/\*/g, "");
   fb.hidden = true; btn.disabled = true; st.textContent = "Enviando…";
   function fail() {
@@ -372,14 +371,13 @@ document.getElementById("mail").addEventListener("click", function () {
     st.textContent = "No se pudo enviar el email desde aquí. Usa WhatsApp o abre tu correo con el botón de abajo.";
   }
   var done = false;
-  var timer = setTimeout(function () { if (!done) { done = true; fail(); } }, 20000);
-  fetch("https://formsubmit.co/ajax/" + MAIL_TO, {
-    method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(data)
-  }).then(function (r) { return r.json(); }).then(function (j) {
-    if (done) return; done = true; clearTimeout(timer);
-    if (j && (j.success === true || j.success === "true")) { btn.disabled = false; st.textContent = "✔ Enviado por email. Si quieres, mándalo también por WhatsApp."; }
-    else fail();
-  }).catch(function () { if (done) return; done = true; clearTimeout(timer); fail(); });
+  var timer = setTimeout(function () { if (!done) { done = true; fail(); } }, 25000);
+  fetch(MAIL_URL, { method: "POST", body: JSON.stringify(data) })
+    .then(function (r) { return r.json(); }).then(function (j) {
+      if (done) return; done = true; clearTimeout(timer);
+      if (j && j.ok === true) { btn.disabled = false; st.textContent = "✔ Enviado por email. Si quieres, mándalo también por WhatsApp."; }
+      else fail();
+    }).catch(function () { if (done) return; done = true; clearTimeout(timer); fail(); });
 });
 
 </script>
